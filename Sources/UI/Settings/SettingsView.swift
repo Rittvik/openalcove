@@ -34,10 +34,14 @@ public struct SettingsView: View {
     
     private var generalTab: some View {
         Form {
-            Section {
+            Section("Display & Layout") {
                 Toggle("Enable Notch Island", isOn: $settings.isNotchEnabled)
                 Toggle("Compact Wings (show mini waveform & artwork)", isOn: $settings.compactMode)
                 Toggle("Simulate Notch on External Displays", isOn: $settings.virtualNotchOnExternalDisplays)
+            }
+            
+            Section("Appearance & Styling") {
+                Toggle("Follow macOS System Accent Color", isOn: $settings.useSystemAccentColor)
             }
         }
         .padding(16)

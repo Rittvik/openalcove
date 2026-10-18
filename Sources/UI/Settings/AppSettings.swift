@@ -36,6 +36,9 @@ public final class AppSettings: ObservableObject {
     @Published public var virtualNotchOnExternalDisplays: Bool {
         didSet { defaults.set(virtualNotchOnExternalDisplays, forKey: "virtualNotchOnExternalDisplays") }
     }
+    @Published public var useSystemAccentColor: Bool {
+        didSet { defaults.set(useSystemAccentColor, forKey: "useSystemAccentColor") }
+    }
     
     public let isFreeAndUnlimitedForever: Bool = true
     
@@ -49,6 +52,7 @@ public final class AppSettings: ObservableObject {
         self.soundEffectsEnabled = defaults.object(forKey: "soundEffectsEnabled") as? Bool ?? true
         self.shelfEnabled = defaults.object(forKey: "shelfEnabled") as? Bool ?? true
         self.virtualNotchOnExternalDisplays = defaults.object(forKey: "virtualNotchOnExternalDisplays") as? Bool ?? false
+        self.useSystemAccentColor = defaults.object(forKey: "useSystemAccentColor") as? Bool ?? true
         
         SoundManager.shared.isSoundEnabled = self.soundEffectsEnabled
     }

@@ -58,7 +58,7 @@ public struct NotchContentView: View {
     private var pillHeight: CGFloat {
         let notchH = geometry.currentMetrics.physicalHeight
         if controller.isExpanded {
-            return 210
+            return 230
         }
         return notchH
     }
@@ -67,29 +67,52 @@ public struct NotchContentView: View {
         let metrics = geometry.currentMetrics
         let notchW = metrics.physicalWidth
         let notchH = metrics.physicalHeight
+        let accentColor = Color(nsColor: .controlAccentColor)
+        let isAccent = settings.useSystemAccentColor && controller.isExpanded
+        let pillBgColor = controller.isExpanded ? Color.black.opacity(0.80) : Color.black
         
         ZStack(alignment: .top) {
-            // Background pill hugging the top bezel
-            NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
-                .fill(Color.black)
-                .overlay(
+            // Background pill hugging the top bezel with translucency & accent tint
+            ZStack {
+                // Base translucent dark glass
+                NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
+                    .fill(pillBgColor)
+                
+                // System accent color tint overlay when enabled
+                if isAccent {
                     NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                )
-                .shadow(
-                    color: Color.black.opacity(controller.isExpanded ? 0.65 : (controller.isHovered ? 0.45 : 0.3)),
-                    radius: controller.isExpanded ? 18 : 8,
-                    x: 0,
-                    y: controller.isExpanded ? 10 : 4
-                )
-                .frame(width: pillWidth, height: pillHeight)
+                        .fill(
+                            LinearGradient(
+                                colors: [accentColor.opacity(0.20), accentColor.opacity(0.06)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+            }
+            .overlay(
+                NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
+                    .stroke(
+                        isAccent ? accentColor.opacity(0.40) : Color.white.opacity(0.14),
+                        lineWidth: isAccent ? 0.8 : 0.5
+                    )
+            )
+            .shadow(
+                color: isAccent
+                    ? accentColor.opacity(0.35)
+                    : Color.black.opacity(controller.isExpanded ? 0.65 : (controller.isHovered ? 0.45 : 0.3)),
+                radius: controller.isExpanded ? 18 : 8,
+                x: 0,
+                y: controller.isExpanded ? 10 : 4
+            )
+            .frame(width: pillWidth, height: pillHeight)
             
             // Content
             if controller.isExpanded {
                 NotchExpandedView(onClose: {
                     controller.setExpanded(false)
                 })
-                .frame(width: 520, height: 210)
+                .frame(width: 520, height: 230)
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             } else {
                 NotchCompactView(

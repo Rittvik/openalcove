@@ -15,6 +15,7 @@ public struct NotchExpandedView: View {
     @ObservedObject var bluetooth = BluetoothManager.shared
     @ObservedObject var shelf = ShelfManager.shared
     @ObservedObject var geometry = ScreenGeometryManager.shared
+    @ObservedObject var settings = AppSettings.shared
     
     @State private var selectedTab: ExpandedTab = .media
     public var onClose: () -> Void
@@ -24,6 +25,8 @@ public struct NotchExpandedView: View {
     }
     
     public var body: some View {
+        let accentColor = Color(nsColor: .controlAccentColor)
+        
         VStack(spacing: 8) {
             // Hardware Notch Clearance: Drops entire card down below the physical camera housing
             Spacer()
@@ -46,8 +49,10 @@ public struct NotchExpandedView: View {
                                 .padding(.vertical, 4)
                                 .background(
                                     selectedTab == tab
-                                        ? RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.16))
-                                        : RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.clear)
+                                        ? RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(settings.useSystemAccentColor ? accentColor.opacity(0.35) : Color.white.opacity(0.16))
+                                        : RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.clear)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -84,14 +89,16 @@ public struct NotchExpandedView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.bottom, 10)
         }
-        .frame(width: 520, height: 210, alignment: .top)
+        .frame(width: 520, height: 230, alignment: .top)
     }
     
     // MARK: - Media Player
     private var mediaSection: some View {
-        VStack(spacing: 8) {
+        let accentColor = Color(nsColor: .controlAccentColor)
+        
+        return VStack(spacing: 8) {
             HStack(spacing: 12) {
                 // Artwork
                 if let artwork = media.track.artwork {
@@ -142,7 +149,7 @@ public struct NotchExpandedView: View {
                 WaveformView(
                     isPlaying: media.track.isPlaying,
                     barCount: 5,
-                    activeColor: Color(red: 0.12, green: 0.84, blue: 0.38),
+                    activeColor: settings.useSystemAccentColor ? accentColor : Color(red: 0.12, green: 0.84, blue: 0.38),
                     maxHeight: 18
                 )
             }
@@ -155,7 +162,7 @@ public struct NotchExpandedView: View {
                             .fill(Color.white.opacity(0.14))
                             .frame(height: 3.5)
                         Capsule()
-                            .fill(Color.white)
+                            .fill(settings.useSystemAccentColor ? accentColor : Color.white)
                             .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(media.progress))), height: 3.5)
                     }
                 }
@@ -173,7 +180,7 @@ public struct NotchExpandedView: View {
             }
             
             // Controls
-            HStack(spacing: 32) {
+            HStack(spacing: 34) {
                 Button(action: {
                     media.previous()
                     SoundManager.shared.play(.haptic)
@@ -191,7 +198,7 @@ public struct NotchExpandedView: View {
                     Image(systemName: media.track.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.system(size: 34))
                         .foregroundColor(.white)
-                        .shadow(color: .white.opacity(0.15), radius: 6)
+                        .shadow(color: settings.useSystemAccentColor ? accentColor.opacity(0.4) : .white.opacity(0.15), radius: 6)
                 }
                 .buttonStyle(.plain)
                 
@@ -205,13 +212,15 @@ public struct NotchExpandedView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 1)
+            .padding(.top, 2)
         }
     }
     
     // MARK: - Controls
     private var controlsSection: some View {
-        VStack(spacing: 10) {
+        let accentColor = Color(nsColor: .controlAccentColor)
+        
+        return VStack(spacing: 8) {
             // Volume
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
@@ -227,7 +236,7 @@ public struct NotchExpandedView: View {
                     get: { Double(volume.volume) },
                     set: { volume.setVolume(Float($0)) }
                 ), in: 0...1)
-                .accentColor(.white)
+                .accentColor(settings.useSystemAccentColor ? accentColor : .white)
             }
             
             // Brightness
@@ -245,21 +254,38 @@ public struct NotchExpandedView: View {
                     get: { Double(brightness.brightness) },
                     set: { brightness.setBrightness(Float($0)) }
                 ), in: 0...1)
-                .accentColor(.yellow)
+                .accentColor(settings.useSystemAccentColor ? accentColor : .yellow)
             }
             
-            // Battery Status
-            HStack {
-                Label(battery.timeRemainingString, systemImage: battery.isCharging ? "bolt.fill" : "battery.100")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(battery.isCharging ? .green : .white.opacity(0.8))
-                Spacer()
-                Text("\(battery.batteryPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(battery.isCharging ? .green : .white)
+            // Battery Status & Accent Color Quick Switch
+            HStack(spacing: 8) {
+                HStack {
+                    Label("Follow Accent Color", systemImage: "paintpalette.fill")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(settings.useSystemAccentColor ? accentColor : .white.opacity(0.8))
+                    Spacer()
+                    Toggle("", isOn: $settings.useSystemAccentColor)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .scaleEffect(0.65)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
+                
+                HStack {
+                    Label(battery.timeRemainingString, systemImage: battery.isCharging ? "bolt.fill" : "battery.100")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(battery.isCharging ? .green : .white.opacity(0.8))
+                    Spacer()
+                    Text("\(battery.batteryPercentage)%")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(battery.isCharging ? .green : .white)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
             }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
         }
     }
     
