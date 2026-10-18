@@ -2,36 +2,47 @@
 
 **OpenAlcove** is an open-source, 100% free re-engineering of the **Alcove** MacBook Pro notch application, reverse-engineered using the **REA (Reverse-Engineer-Anything)** framework with Hopper Disassembler and native macOS system frameworks.
 
-All features that previously required a paid license or expired after a trial are **unlocked forever** and run completely on-device with zero telemetry, zero paywalls, and zero cloud dependency.
+All features that previously required a paid license or expired after a trial are **unlocked forever** and run completely on-device with zero telemetry, zero paywalls, and zero cloud dependencies.
+
+---
+
+## 📥 Download & Install
+
+You can download the pre-built disk image installer directly from this repository:
+
+👉 **[Download OpenAlcove.dmg](https://github.com/Rittvik/openalcove/raw/main/OpenAlcove.dmg)**
+
+### Quick Installation:
+1. Download **`OpenAlcove.dmg`**.
+2. Open the disk image.
+3. Drag **`OpenAlcove.app`** into your **`Applications`** folder.
+4. Launch OpenAlcove!
 
 ---
 
 ## ⚡ Key Features Rebuilt
 
-1. **Dynamic Island Notch Panel**:
-   - **Hardware Notch Detection**: Automatically reads `NSScreen.safeAreaInsets.top` and `screen.auxiliaryTopLeftArea` / `auxiliaryTopRightArea` to match your display notch down to the exact pixel.
-   - **Virtual Notch Support**: Simulates a sleek dynamic island on non-notch Macs or external monitors.
-   - **Window Behavior (Decompiled with REA)**:
-     - Window Level: `CGShieldingWindowLevel() + 1` (floats smoothly above menus and full-screen apps).
-     - Collection Behavior: `[.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]` (collection flag `0x151`).
-     - Non-activating panel (`canBecomeKey = false`, `canBecomeMain = false`) ensuring it never steals keyboard focus from active apps.
+1. **Hardware-Accurate Dynamic Notch Island**:
+   - **Precise Hardware Alignment**: Measures `NSScreen.safeAreaInsets.top` and `auxiliaryTopLeftArea` / `auxiliaryTopRightArea` to sit flush against the physical camera bezel.
+   - **Glanceable Idle State**: When no media is playing, the closed notch displays the live **time** on the left wing and the **battery percentage / charging bolt** on the right wing.
+   - **Virtual Notch Support**: Simulates a sleek dynamic island on non-notch Macs and external monitors.
+   - **Native Window Behavior**: Floating window level `CGShieldingWindowLevel() + 1`, collection behavior `[.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]`, and non-activating panel (`canBecomeKey = false`) so it never steals keyboard focus.
 
 2. **Now Playing Media Island**:
-   - Real-time media playback integration with Apple Music, Spotify, YouTube, Safari, Chrome, and Podcasts via `MediaRemote.framework`.
+   - Real-time media playback integration with Spotify, Apple Music, YouTube (Safari/Chrome), Podcasts, and web audio.
    - **Live Artwork**: Album art extraction with rounded continuous corners.
    - **Marquee Text**: Automatically scrolls long track titles and artist names smoothly.
-   - **Waveform Visualizer**: Multi-bar animated audio waveform that pulses while audio is actively playing.
-   - **Interactive Playback Controls**: Previous, Play/Pause, and Next track controls.
+   - **Waveform Visualizer**: Multi-bar animated audio waveform that pulses in real time while audio is playing.
+   - **Interactive Playback Controls**: Tactile Previous, Play/Pause, and Next track controls.
    - **Scrubbable Progress Bar**: Live elapsed time, remaining time, and progress visualization.
 
 3. **System HUD Replacements**:
-   - **Fluid Volume HUD**: Intercepts CoreAudio volume events (`AudioObjectAddPropertyListenerBlock`), blooms from the notch with speaker icon and volume fill bar, and plays subtle volume tick feedback.
+   - **Fluid Volume HUD**: Intercepts CoreAudio volume events (`AudioObjectAddPropertyListenerBlock`), blooms from the notch with a speaker icon and volume fill bar, accompanied by subtle volume tick feedback.
    - **Display Brightness HUD**: Monitors screen brightness (`DisplayServices.framework`) with sun icon and animated level.
    - **Charging & MagSafe Alert**: Triggers a green charging animation with battery percentage and Apple charging chime whenever USB-C or MagSafe is plugged in.
 
 4. **AirPods & Bluetooth Audio Integration**:
    - Monitors connected devices via `IOBluetooth`.
-   - Detects AirPods Pro, AirPods Max, and standard AirPods.
    - Real-time battery status gauges for **Left Earbud**, **Right Earbud**, and **Charging Case**.
 
 5. **Alcove File Shelf (Dropzone)**:
@@ -50,11 +61,11 @@ All features that previously required a paid license or expired after a trial ar
 ## 🛠️ Project Structure
 
 ```text
-/Users/rittvikvashishtha/Notch/
-├── OpenAlcove.app/                # Compiled and signed native macOS application bundle
+openalcove/
+├── OpenAlcove.dmg                 # Ready-to-use disk image installer
 ├── Package.swift                  # Swift Package Manager manifest
 ├── Scripts/
-│   └── build_app.sh              # One-click release build and code-signing script
+│   └── build_app.sh              # One-click release build, code-sign & DMG generation
 └── Sources/
     ├── main.swift                 # Application entry point
     ├── App/
@@ -65,7 +76,7 @@ All features that previously required a paid license or expired after a trial ar
     │   └── SoundManager.swift     # Audio player & haptic sound engine
     ├── Features/
     │   ├── Media/
-    │   │   ├── MediaRemoteBridge.swift # MediaRemote dynamic loader & notifications
+    │   │   ├── MediaRemoteBridge.swift # Dual-engine media controller & Spotify bridge
     │   │   ├── MediaManager.swift      # Playback state & metadata model
     │   │   ├── WaveformView.swift      # Animated audio waveform
     │   │   └── MarqueeText.swift       # Smooth scrolling marquee text
@@ -82,7 +93,7 @@ All features that previously required a paid license or expired after a trial ar
     │       └── CalendarQuickView.swift # Calendar schedule & clock
     ├── UI/
     │   ├── NotchContentView.swift      # Main state machine & spring animations
-    │   ├── NotchCompactView.swift      # Compact notch wings & live activities
+    │   ├── NotchCompactView.swift      # Compact notch wings & idle time/battery
     │   ├── NotchExpandedView.swift     # Drop-down card with media, HUDs, AirPods, shelf
     │   └── Settings/
     │       ├── AppSettings.swift       # Persistent user preferences
@@ -94,20 +105,22 @@ All features that previously required a paid license or expired after a trial ar
 
 ---
 
-## 🚀 Building & Running
+## 🚀 Building from Source
 
-### Run the App
-The application is pre-built, signed, and currently active on your Mac:
+To clone and compile the project locally:
+
 ```bash
-open /Users/rittvikvashishtha/Notch/OpenAlcove.app
+git clone https://github.com/Rittvik/openalcove.git
+cd openalcove
 ```
 
-### Recompile from Source
-To rebuild the application after making any modifications:
+### Build App & DMG Installer
+Run the build script to compile the release binary, package `OpenAlcove.app`, and create `OpenAlcove.dmg`:
 ```bash
-/Users/rittvikvashishtha/Notch/Scripts/build_app.sh
+./Scripts/build_app.sh
 ```
-or with Swift Package Manager:
+
+Or build with Swift Package Manager:
 ```bash
 swift build -c release
 ```

@@ -6,7 +6,6 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 
 # Binaries & Archives
-*.dmg
 Alcove.dmg
 Alcove.app
 OpenAlcove.app

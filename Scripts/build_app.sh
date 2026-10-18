@@ -64,4 +64,17 @@ EOF
 echo "==> Ad-hoc code signing..."
 codesign --force --deep --sign - "$APP_DIR"
 
+echo "==> Creating OpenAlcove.dmg installer..."
+DMG_PATH="$DIR/OpenAlcove.dmg"
+STAGING_DIR="/tmp/openalcove_dmg_staging"
+rm -rf "$STAGING_DIR" "$DMG_PATH"
+mkdir -p "$STAGING_DIR"
+cp -R "$APP_DIR" "$STAGING_DIR/"
+ln -s /Applications "$STAGING_DIR/Applications"
+
+hdiutil create -volname "OpenAlcove" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH" > /dev/null
+rm -rf "$STAGING_DIR"
+
 echo "==> Successfully built $APP_DIR"
+echo "==> Successfully created $DMG_PATH"
+
