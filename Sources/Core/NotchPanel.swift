@@ -146,7 +146,7 @@ public final class NotchController: ObservableObject {
             collapseWorkItem = nil
             
             let width: CGFloat = 560
-            let height: CGFloat = 290
+            let height: CGFloat = 240
             let rect = NSRect(
                 x: centerX - (width / 2.0),
                 y: topY - height,
@@ -188,7 +188,7 @@ public final class NotchController: ObservableObject {
         let metrics = ScreenGeometryManager.shared.currentMetrics
         
         let width: CGFloat = isExpanded ? 560 : max(metrics.physicalWidth + 140, 360)
-        let height: CGFloat = isExpanded ? 290 : metrics.physicalHeight + 16
+        let height: CGFloat = isExpanded ? 240 : metrics.physicalHeight + 16
         
         let rect = NSRect(
             x: centerX - (width / 2.0),

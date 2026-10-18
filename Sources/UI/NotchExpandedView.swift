@@ -84,11 +84,9 @@ public struct NotchExpandedView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-            
-            Spacer(minLength: 4)
+            .padding(.bottom, 12)
         }
-        .frame(width: 520, height: 260, alignment: .top)
+        .frame(width: 520, height: 210, alignment: .top)
     }
     
     // MARK: - Media Player

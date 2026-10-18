@@ -58,7 +58,7 @@ public struct NotchContentView: View {
     private var pillHeight: CGFloat {
         let notchH = geometry.currentMetrics.physicalHeight
         if controller.isExpanded {
-            return 260
+            return 210
         }
         return notchH
     }
@@ -89,7 +89,7 @@ public struct NotchContentView: View {
                 NotchExpandedView(onClose: {
                     controller.setExpanded(false)
                 })
-                .frame(width: 520, height: 260)
+                .frame(width: 520, height: 210)
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             } else {
                 NotchCompactView(
