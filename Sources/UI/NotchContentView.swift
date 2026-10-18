@@ -33,6 +33,7 @@ public struct NotchPillShape: Shape {
 }
 
 public struct NotchContentView: View {
+    @ObservedObject var controller = NotchController.shared
     @ObservedObject var geometry = ScreenGeometryManager.shared
     @ObservedObject var media = MediaManager.shared
     @ObservedObject var volume = VolumeManager.shared
@@ -41,26 +42,23 @@ public struct NotchContentView: View {
     @ObservedObject var bluetooth = BluetoothManager.shared
     @ObservedObject var settings = AppSettings.shared
     
-    @State private var isHovered: Bool = false
-    @State private var isExpanded: Bool = false
-    
     public init() {}
     
     private var pillWidth: CGFloat {
         let notchW = geometry.currentMetrics.physicalWidth
-        if isExpanded {
-            return 390
+        if controller.isExpanded {
+            return 520
         }
-        if isHovered {
-            return notchW + 110
+        if controller.isHovered {
+            return notchW + 125
         }
-        return notchW + 90
+        return notchW + 110
     }
     
     private var pillHeight: CGFloat {
         let notchH = geometry.currentMetrics.physicalHeight
-        if isExpanded {
-            return 200
+        if controller.isExpanded {
+            return 260
         }
         return notchH
     }
@@ -72,29 +70,27 @@ public struct NotchContentView: View {
         
         ZStack(alignment: .top) {
             // Background pill hugging the top bezel
-            NotchPillShape(bottomRadius: isExpanded ? 24 : 16)
+            NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
                 .fill(Color.black)
                 .overlay(
-                    NotchPillShape(bottomRadius: isExpanded ? 24 : 16)
+                    NotchPillShape(bottomRadius: controller.isExpanded ? 26 : 16)
                         .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                 )
                 .shadow(
-                    color: Color.black.opacity(isExpanded ? 0.6 : (isHovered ? 0.4 : 0.25)),
-                    radius: isExpanded ? 16 : 8,
+                    color: Color.black.opacity(controller.isExpanded ? 0.65 : (controller.isHovered ? 0.45 : 0.3)),
+                    radius: controller.isExpanded ? 18 : 8,
                     x: 0,
-                    y: isExpanded ? 8 : 4
+                    y: controller.isExpanded ? 10 : 4
                 )
                 .frame(width: pillWidth, height: pillHeight)
             
             // Content
-            if isExpanded {
+            if controller.isExpanded {
                 NotchExpandedView(onClose: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isExpanded = false
-                    }
+                    controller.setExpanded(false)
                 })
-                .frame(width: 390, height: 200)
-                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                .frame(width: 520, height: 260)
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             } else {
                 NotchCompactView(
                     notchWidth: notchW,
@@ -103,26 +99,22 @@ public struct NotchContentView: View {
                 .frame(width: pillWidth, height: notchH)
                 .contentShape(Rectangle())
                 .onHover { hovering in
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                        isHovered = hovering
-                    }
+                    controller.handleHover(hovering)
                     if hovering {
                         SoundManager.shared.play(.haptic)
                     }
                 }
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isExpanded = true
-                    }
+                    controller.setExpanded(true)
                     SoundManager.shared.play(.haptic)
                 }
             }
         }
         .frame(width: pillWidth, height: pillHeight, alignment: .top)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
-        .animation(.spring(response: 0.28, dampingFraction: 0.75), value: isHovered)
-        .onChange(of: isExpanded) { expanded in
-            NotchController.shared.setExpanded(expanded)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: controller.isExpanded)
+        .animation(.spring(response: 0.28, dampingFraction: 0.75), value: controller.isHovered)
+        .onHover { hovering in
+            controller.handleHover(hovering)
         }
     }
 }

@@ -24,10 +24,41 @@ public final class NotchPanel: NSPanel {
         // canJoinAllSpaces | stationary | ignoresCycle | fullScreenAuxiliary (0x151 from Hopper decompilation)
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         self.ignoresMouseEvents = false
+        self.acceptsMouseMovedEvents = true
     }
     
     public override var canBecomeKey: Bool { false }
     public override var canBecomeMain: Bool { false }
+}
+
+public final class HoverTrackingHostingView<Content: View>: NSHostingView<Content> {
+    private var trackingArea: NSTrackingArea?
+    
+    public override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea = trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let options: NSTrackingArea.Options = [
+            .mouseEnteredAndExited,
+            .mouseMoved,
+            .activeAlways,
+            .inVisibleRect
+        ]
+        let newArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(newArea)
+        self.trackingArea = newArea
+    }
+    
+    public override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        NotchController.shared.handleHover(true)
+    }
+    
+    public override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        NotchController.shared.handleHover(false)
+    }
 }
 
 public final class NotchController: ObservableObject {
@@ -35,6 +66,9 @@ public final class NotchController: ObservableObject {
     
     public private(set) var panel: NotchPanel?
     @Published public var isExpanded: Bool = false
+    @Published public var isHovered: Bool = false
+    
+    private var collapseWorkItem: DispatchWorkItem?
     
     private init() {}
     
@@ -45,18 +79,19 @@ public final class NotchController: ObservableObject {
         let topY = screen.frame.maxY
         let centerX = screen.frame.midX
         
-        let windowWidth: CGFloat = 440
-        let initialHeight: CGFloat = 50
+        let metrics = ScreenGeometryManager.shared.currentMetrics
+        let initialWidth: CGFloat = max(metrics.physicalWidth + 140, 360)
+        let initialHeight: CGFloat = metrics.physicalHeight + 16
         
         let rect = NSRect(
-            x: centerX - (windowWidth / 2.0),
+            x: centerX - (initialWidth / 2.0),
             y: topY - initialHeight,
-            width: windowWidth,
+            width: initialWidth,
             height: initialHeight
         )
         
         let newPanel = NotchPanel(contentRect: rect)
-        let hostingView = NSHostingView(rootView: NotchRootView())
+        let hostingView = HoverTrackingHostingView(rootView: NotchRootView())
         newPanel.contentView = hostingView
         newPanel.orderFrontRegardless()
         
@@ -71,13 +106,89 @@ public final class NotchController: ObservableObject {
         }
     }
     
+    public func handleHover(_ hovering: Bool) {
+        if hovering {
+            collapseWorkItem?.cancel()
+            collapseWorkItem = nil
+            
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                self.isHovered = true
+            }
+            
+            if !isExpanded {
+                setExpanded(true)
+            }
+        } else {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                self.isHovered = false
+            }
+            
+            // Debounce collapse by 0.45s so accidental cursor slip doesn't snap notch shut
+            collapseWorkItem?.cancel()
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                if self.isExpanded {
+                    self.setExpanded(false)
+                }
+            }
+            collapseWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: workItem)
+        }
+    }
+    
     public func setExpanded(_ expanded: Bool) {
-        self.isExpanded = expanded
         guard let panel = panel, let screen = NSScreen.main else { return }
         let topY = screen.frame.maxY
         let centerX = screen.frame.midX
-        let width: CGFloat = 440
-        let height: CGFloat = expanded ? 230 : 50
+        
+        if expanded {
+            collapseWorkItem?.cancel()
+            collapseWorkItem = nil
+            
+            let width: CGFloat = 560
+            let height: CGFloat = 290
+            let rect = NSRect(
+                x: centerX - (width / 2.0),
+                y: topY - height,
+                width: width,
+                height: height
+            )
+            // Expand window frame first so animation has room
+            panel.setFrame(rect, display: true, animate: false)
+            
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                self.isExpanded = true
+            }
+        } else {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                self.isExpanded = false
+            }
+            
+            // Shrink window after pill animation completes to avoid clipping
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                guard let self = self, !self.isExpanded, let panel = self.panel, let screen = NSScreen.main else { return }
+                let metrics = ScreenGeometryManager.shared.currentMetrics
+                let width: CGFloat = max(metrics.physicalWidth + 140, 360)
+                let height: CGFloat = metrics.physicalHeight + 16
+                let rect = NSRect(
+                    x: screen.frame.midX - (width / 2.0),
+                    y: screen.frame.maxY - height,
+                    width: width,
+                    height: height
+                )
+                panel.setFrame(rect, display: true, animate: false)
+            }
+        }
+    }
+    
+    public func reposition() {
+        guard let panel = panel, let screen = NSScreen.main else { return }
+        let topY = screen.frame.maxY
+        let centerX = screen.frame.midX
+        let metrics = ScreenGeometryManager.shared.currentMetrics
+        
+        let width: CGFloat = isExpanded ? 560 : max(metrics.physicalWidth + 140, 360)
+        let height: CGFloat = isExpanded ? 290 : metrics.physicalHeight + 16
         
         let rect = NSRect(
             x: centerX - (width / 2.0),
@@ -86,10 +197,6 @@ public final class NotchController: ObservableObject {
             height: height
         )
         panel.setFrame(rect, display: true, animate: false)
-    }
-    
-    public func reposition() {
-        setExpanded(isExpanded)
     }
 }
 

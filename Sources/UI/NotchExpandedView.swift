@@ -14,6 +14,7 @@ public struct NotchExpandedView: View {
     @ObservedObject var battery = BatteryManager.shared
     @ObservedObject var bluetooth = BluetoothManager.shared
     @ObservedObject var shelf = ShelfManager.shared
+    @ObservedObject var geometry = ScreenGeometryManager.shared
     
     @State private var selectedTab: ExpandedTab = .media
     public var onClose: () -> Void
@@ -23,7 +24,11 @@ public struct NotchExpandedView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            // Hardware Notch Clearance: Drops entire card down below the physical camera housing
+            Spacer()
+                .frame(height: max(geometry.currentMetrics.physicalHeight, 38) + 6)
+            
             // MARK: - Header Bar & Tab Switcher
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
@@ -37,7 +42,7 @@ public struct NotchExpandedView: View {
                             Text(tab.rawValue)
                                 .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .medium, design: .rounded))
                                 .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.45))
-                                .padding(.horizontal, 9)
+                                .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                                 .background(
                                     selectedTab == tab
@@ -63,8 +68,7 @@ public struct NotchExpandedView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.top, 6)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             
             // MARK: - Tab Body
             Group {
@@ -79,10 +83,12 @@ public struct NotchExpandedView: View {
                     ShelfDropzoneView()
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+            
+            Spacer(minLength: 4)
         }
-        .frame(width: 390, height: 200)
+        .frame(width: 520, height: 260, alignment: .top)
     }
     
     // MARK: - Media Player
