@@ -1,5 +1,37 @@
 import SwiftUI
 
+public struct NotchPillShape: Shape {
+    public var bottomRadius: CGFloat = 14
+    
+    public init(bottomRadius: CGFloat = 14) {
+        self.bottomRadius = bottomRadius
+    }
+    
+    public func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - bottomRadius))
+        path.addArc(
+            center: CGPoint(x: rect.maxX - bottomRadius, y: rect.maxY - bottomRadius),
+            radius: bottomRadius,
+            startAngle: .degrees(0),
+            endAngle: .degrees(90),
+            clockwise: false
+        )
+        path.addLine(to: CGPoint(x: rect.minX + bottomRadius, y: rect.maxY))
+        path.addArc(
+            center: CGPoint(x: rect.minX + bottomRadius, y: rect.maxY - bottomRadius),
+            radius: bottomRadius,
+            startAngle: .degrees(90),
+            endAngle: .degrees(180),
+            clockwise: false
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 public struct NotchContentView: View {
     @ObservedObject var geometry = ScreenGeometryManager.shared
     @ObservedObject var media = MediaManager.shared
@@ -8,21 +40,29 @@ public struct NotchContentView: View {
     @ObservedObject var battery = BatteryManager.shared
     @ObservedObject var bluetooth = BluetoothManager.shared
     @ObservedObject var settings = AppSettings.shared
+    @ObservedObject var controller = NotchController.shared
     
     @State private var isHovered: Bool = false
-    @State private var isExpanded: Bool = false
     
     public init() {}
     
-    private var isCompactActive: Bool {
-        settings.compactMode && (
-            media.hasActiveMedia ||
-            volume.isHUDVisible ||
-            brightness.isHUDVisible ||
-            battery.isChargingHUDVisible ||
-            bluetooth.isDeviceBannerVisible ||
-            isHovered
-        )
+    private var pillWidth: CGFloat {
+        let notchW = geometry.currentMetrics.physicalWidth
+        if controller.isExpanded {
+            return 390
+        }
+        if isHovered {
+            return notchW + 110
+        }
+        return notchW + 90
+    }
+    
+    private var pillHeight: CGFloat {
+        let notchH = geometry.currentMetrics.physicalHeight
+        if controller.isExpanded {
+            return 200
+        }
+        return notchH
     }
     
     public var body: some View {
@@ -30,56 +70,51 @@ public struct NotchContentView: View {
         let notchW = metrics.physicalWidth
         let notchH = metrics.physicalHeight
         
-        VStack(spacing: 0) {
-            if isExpanded {
+        ZStack(alignment: .top) {
+            // Background pill hugging the top bezel
+            NotchPillShape(bottomRadius: controller.isExpanded ? 24 : 16)
+                .fill(Color.black)
+                .overlay(
+                    NotchPillShape(bottomRadius: controller.isExpanded ? 24 : 16)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                )
+                .shadow(color: Color.black.opacity(controller.isExpanded ? 0.6 : (isHovered ? 0.4 : 0.25)), radius: controller.isExpanded ? 16 : 8, x: 0, y: controller.isExpanded ? 8 : 4)
+                .frame(width: pillWidth, height: pillHeight)
+            
+            // Content
+            if controller.isExpanded {
                 NotchExpandedView(onClose: {
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                        isExpanded = false
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        controller.setExpanded(false)
                     }
                 })
-                .transition(.asymmetric(
-                    insertion: .scale(scale: 0.85, anchor: .top).combined(with: .opacity),
-                    removal: .scale(scale: 0.9, anchor: .top).combined(with: .opacity)
-                ))
+                .frame(width: 390, height: 200)
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else {
-                // Notch Bar / Compact Live Island
-                ZStack(alignment: .top) {
-                    // Black notch base matching hardware notch
-                    RoundedRectangle(cornerRadius: isCompactActive ? 18 : 10, style: .continuous)
-                        .fill(Color.black)
-                        .frame(
-                            width: isCompactActive ? notchW + 80 : notchW,
-                            height: isCompactActive ? notchH + 6 : notchH
-                        )
-                        .shadow(color: isCompactActive ? Color.black.opacity(0.4) : Color.clear, radius: 8, x: 0, y: 4)
-                    
-                    if isCompactActive {
-                        NotchCompactView(
-                            notchWidth: notchW,
-                            notchHeight: notchH
-                        )
-                        .frame(width: notchW + 80, height: notchH + 6)
-                        .transition(.opacity)
-                    }
-                }
+                NotchCompactView(
+                    notchWidth: notchW,
+                    notchHeight: notchH
+                )
+                .frame(width: pillWidth, height: notchH)
                 .contentShape(Rectangle())
                 .onHover { hovering in
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
                         isHovered = hovering
                     }
-                    if hovering && !isExpanded {
+                    if hovering {
                         SoundManager.shared.play(.haptic)
                     }
                 }
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
-                        isExpanded.toggle()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        controller.setExpanded(true)
                     }
                     SoundManager.shared.play(.haptic)
                 }
             }
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.78), value: isExpanded)
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isCompactActive)
+        .frame(width: pillWidth, height: pillHeight, alignment: .top)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: controller.isExpanded)
+        .animation(.spring(response: 0.28, dampingFraction: 0.75), value: isHovered)
     }
 }

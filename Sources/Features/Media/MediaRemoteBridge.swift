@@ -9,7 +9,7 @@ public struct TrackInfo: Equatable {
     public var duration: Double
     public var elapsedTime: Double
     public var isPlaying: Bool
-    public var bundleIdentifier: String?
+    public var source: String // "spotify", "music", "mediaremote"
     
     public init(
         title: String = "",
@@ -19,7 +19,7 @@ public struct TrackInfo: Equatable {
         duration: Double = 0,
         elapsedTime: Double = 0,
         isPlaying: Bool = false,
-        bundleIdentifier: String? = nil
+        source: String = ""
     ) {
         self.title = title
         self.artist = artist
@@ -28,7 +28,7 @@ public struct TrackInfo: Equatable {
         self.duration = duration
         self.elapsedTime = elapsedTime
         self.isPlaying = isPlaying
-        self.bundleIdentifier = bundleIdentifier
+        self.source = source
     }
 }
 
@@ -47,8 +47,9 @@ public final class MediaRemoteBridge {
     
     public var onTrackChanged: ((TrackInfo) -> Void)?
     
-    private var currentTrack = TrackInfo()
+    public var currentTrack = TrackInfo()
     private var pollTimer: Timer?
+    private var lastArtworkURL: String?
     
     private init() {
         loadFramework()
@@ -77,107 +78,243 @@ public final class MediaRemoteBridge {
     private func startObserving() {
         registerForNotifications?(DispatchQueue.main)
         
-        let nc = NotificationCenter.default
-        let notificationNames = [
-            "kMRMediaRemoteNowPlayingInfoDidChangeNotification",
-            "kMRMediaRemoteNowPlayingApplicationDidChangeNotification",
-            "kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification"
-        ]
-        
-        for name in notificationNames {
-            nc.addObserver(
-                self,
-                selector: #selector(handleNotification),
-                name: NSNotification.Name(name),
-                object: nil
-            )
-        }
-        
-        // Also observe distributed notifications for Spotify and Apple Music
-        let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(
-            self,
-            selector: #selector(handleNotification),
-            name: NSNotification.Name("com.apple.Music.playerInfo"),
-            object: nil
-        )
-        dnc.addObserver(
-            self,
-            selector: #selector(handleNotification),
-            name: NSNotification.Name("com.spotify.client.PlaybackStateChanged"),
-            object: nil
-        )
-        
-        // Initial query
+        // Initial fetch
         updateNowPlaying()
         
-        // Timer for progress updates when playing
+        // Active polling every 1 second: keeps Now Playing accurate across all apps
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            if self.currentTrack.isPlaying {
-                self.currentTrack.elapsedTime = min(self.currentTrack.duration, self.currentTrack.elapsedTime + 1.0)
-                self.onTrackChanged?(self.currentTrack)
-            }
-        }
-    }
-    
-    @objc private func handleNotification() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.updateNowPlaying()
+            self?.updateNowPlaying()
         }
     }
     
     public func updateNowPlaying() {
-        getIsPlaying?(DispatchQueue.main) { [weak self] playing in
-            guard let self = self else { return }
-            self.currentTrack.isPlaying = playing
+        // Priority 1: Check Spotify directly if active
+        if checkSpotify() {
+            return
+        }
+        
+        // Priority 2: Check Apple Music directly if active
+        if checkAppleMusic() {
+            return
+        }
+        
+        // Priority 3: MediaRemote framework (YouTube in Safari/Chrome, Podcasts, Web browsers)
+        checkMediaRemote()
+    }
+    
+    private func checkSpotify() -> Bool {
+        let script = """
+        if application "Spotify" is running then
+            tell application "Spotify"
+                try
+                    set trackName to name of current track
+                    set artistName to artist of current track
+                    set albumName to album of current track
+                    set artUrl to artwork url of current track
+                    set playerState to player state as string
+                    set playerPos to player position as integer
+                    set trackDur to duration of current track as integer
+                    return trackName & "|||" & artistName & "|||" & albumName & "|||" & artUrl & "|||" & playerState & "|||" & (playerPos as string) & "|||" & (trackDur as string)
+                on error
+                    return ""
+                end try
+            end tell
+        else
+            return ""
+        end if
+        """
+        
+        guard let output = runAppleScript(script), !output.isEmpty, output.contains("|||") else {
+            return false
+        }
+        
+        let parts = output.components(separatedBy: "|||")
+        if parts.count >= 5 {
+            let title = parts[0]
+            let artist = parts[1]
+            let album = parts[2]
+            let artUrl = parts[3]
+            let state = parts[4].lowercased()
+            let isPlaying = (state == "playing")
             
-            self.getNowPlayingInfo?(DispatchQueue.main) { [weak self] info in
-                guard let self = self else { return }
-                
-                let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
-                let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
-                let album = info["kMRMediaRemoteNowPlayingInfoAlbum"] as? String ?? ""
-                let duration = info["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0.0
-                let elapsed = info["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0.0
-                
-                var artwork: NSImage? = nil
-                if let data = info["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data {
-                    artwork = NSImage(data: data)
+            var elapsed: Double = 0
+            var duration: Double = 0
+            if parts.count >= 7 {
+                elapsed = Double(parts[5]) ?? 0
+                duration = (Double(parts[6]) ?? 0) / 1000.0 // Spotify duration is in ms
+            }
+            
+            self.currentTrack.title = title
+            self.currentTrack.artist = artist
+            self.currentTrack.album = album
+            self.currentTrack.isPlaying = isPlaying
+            self.currentTrack.elapsedTime = elapsed
+            self.currentTrack.duration = duration
+            self.currentTrack.source = "spotify"
+            
+            // Fetch artwork asynchronously if changed
+            if !artUrl.isEmpty && artUrl != self.lastArtworkURL {
+                self.lastArtworkURL = artUrl
+                DispatchQueue.global(qos: .utility).async { [weak self] in
+                    if let url = URL(string: artUrl), let data = try? Data(contentsOf: url), let img = NSImage(data: data) {
+                        DispatchQueue.main.async {
+                            self?.currentTrack.artwork = img
+                            self?.notifyChange()
+                        }
+                    }
                 }
-                
+            }
+            
+            notifyChange()
+            return true
+        }
+        return false
+    }
+    
+    private func checkAppleMusic() -> Bool {
+        let script = """
+        if application "Music" is running then
+            tell application "Music"
+                try
+                    if player state is playing or player state is paused then
+                        set trackName to name of current track
+                        set artistName to artist of current track
+                        set albumName to album of current track
+                        set playerState to player state as string
+                        set playerPos to player position as integer
+                        set trackDur to duration of current track as integer
+                        return trackName & "|||" & artistName & "|||" & albumName & "|||" & playerState & "|||" & (playerPos as string) & "|||" & (trackDur as string)
+                    end if
+                on error
+                    return ""
+                end try
+            end tell
+        end if
+        return ""
+        """
+        
+        guard let output = runAppleScript(script), !output.isEmpty, output.contains("|||") else {
+            return false
+        }
+        
+        let parts = output.components(separatedBy: "|||")
+        if parts.count >= 4 {
+            let title = parts[0]
+            let artist = parts[1]
+            let album = parts[2]
+            let state = parts[3].lowercased()
+            let isPlaying = (state == "playing")
+            
+            var elapsed: Double = 0
+            var duration: Double = 0
+            if parts.count >= 6 {
+                elapsed = Double(parts[4]) ?? 0
+                duration = Double(parts[5]) ?? 0
+            }
+            
+            self.currentTrack.title = title
+            self.currentTrack.artist = artist
+            self.currentTrack.album = album
+            self.currentTrack.isPlaying = isPlaying
+            self.currentTrack.elapsedTime = elapsed
+            self.currentTrack.duration = duration
+            self.currentTrack.source = "music"
+            
+            notifyChange()
+            return true
+        }
+        return false
+    }
+    
+    private func checkMediaRemote() {
+        guard let getInfo = getNowPlayingInfo else { return }
+        
+        getInfo(DispatchQueue.main) { [weak self] info in
+            guard let self = self else { return }
+            
+            let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String ?? ""
+            let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
+            let album = info["kMRMediaRemoteNowPlayingInfoAlbum"] as? String ?? ""
+            let duration = info["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0.0
+            let elapsed = info["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0.0
+            let rate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
+            
+            if !title.isEmpty {
                 self.currentTrack.title = title
                 self.currentTrack.artist = artist
                 self.currentTrack.album = album
                 self.currentTrack.duration = duration
                 self.currentTrack.elapsedTime = elapsed
-                if artwork != nil {
-                    self.currentTrack.artwork = artwork
+                self.currentTrack.isPlaying = (rate > 0.0)
+                self.currentTrack.source = "mediaremote"
+                
+                if let data = info["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data {
+                    self.currentTrack.artwork = NSImage(data: data)
                 }
                 
-                DispatchQueue.main.async {
-                    self.onTrackChanged?(self.currentTrack)
-                }
+                self.notifyChange()
+            } else if self.currentTrack.source == "mediaremote" {
+                // Cleared
+                self.currentTrack = TrackInfo()
+                self.notifyChange()
             }
         }
     }
     
+    private func notifyChange() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.onTrackChanged?(self.currentTrack)
+        }
+    }
+    
+    private func runAppleScript(_ source: String) -> String? {
+        var error: NSDictionary?
+        if let scriptObject = NSAppleScript(source: source) {
+            let output = scriptObject.executeAndReturnError(&error)
+            if error == nil {
+                return output.stringValue
+            }
+        }
+        return nil
+    }
+    
     public func togglePlayPause() {
-        _ = sendCommand?(2, nil) // 2 = kMRTogglePlayPause
+        if currentTrack.source == "spotify" {
+            _ = runAppleScript("tell application \"Spotify\" to playpause")
+        } else if currentTrack.source == "music" {
+            _ = runAppleScript("tell application \"Music\" to playpause")
+        } else {
+            _ = sendCommand?(2, nil) // 2 = kMRTogglePlayPause
+        }
+        currentTrack.isPlaying.toggle()
+        notifyChange()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.updateNowPlaying()
         }
     }
     
     public func nextTrack() {
-        _ = sendCommand?(4, nil) // 4 = kMRNextTrack
+        if currentTrack.source == "spotify" {
+            _ = runAppleScript("tell application \"Spotify\" to next track")
+        } else if currentTrack.source == "music" {
+            _ = runAppleScript("tell application \"Music\" to next track")
+        } else {
+            _ = sendCommand?(4, nil) // 4 = kMRNextTrack
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.updateNowPlaying()
         }
     }
     
     public func previousTrack() {
-        _ = sendCommand?(5, nil) // 5 = kMRPreviousTrack
+        if currentTrack.source == "spotify" {
+            _ = runAppleScript("tell application \"Spotify\" to previous track")
+        } else if currentTrack.source == "music" {
+            _ = runAppleScript("tell application \"Music\" to previous track")
+        } else {
+            _ = sendCommand?(5, nil) // 5 = kMRPreviousTrack
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.updateNowPlaying()
         }
