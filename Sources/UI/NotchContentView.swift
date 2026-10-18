@@ -40,15 +40,15 @@ public struct NotchContentView: View {
     @ObservedObject var battery = BatteryManager.shared
     @ObservedObject var bluetooth = BluetoothManager.shared
     @ObservedObject var settings = AppSettings.shared
-    @ObservedObject var controller = NotchController.shared
     
     @State private var isHovered: Bool = false
+    @State private var isExpanded: Bool = false
     
     public init() {}
     
     private var pillWidth: CGFloat {
         let notchW = geometry.currentMetrics.physicalWidth
-        if controller.isExpanded {
+        if isExpanded {
             return 390
         }
         if isHovered {
@@ -59,7 +59,7 @@ public struct NotchContentView: View {
     
     private var pillHeight: CGFloat {
         let notchH = geometry.currentMetrics.physicalHeight
-        if controller.isExpanded {
+        if isExpanded {
             return 200
         }
         return notchH
@@ -72,20 +72,25 @@ public struct NotchContentView: View {
         
         ZStack(alignment: .top) {
             // Background pill hugging the top bezel
-            NotchPillShape(bottomRadius: controller.isExpanded ? 24 : 16)
+            NotchPillShape(bottomRadius: isExpanded ? 24 : 16)
                 .fill(Color.black)
                 .overlay(
-                    NotchPillShape(bottomRadius: controller.isExpanded ? 24 : 16)
+                    NotchPillShape(bottomRadius: isExpanded ? 24 : 16)
                         .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(controller.isExpanded ? 0.6 : (isHovered ? 0.4 : 0.25)), radius: controller.isExpanded ? 16 : 8, x: 0, y: controller.isExpanded ? 8 : 4)
+                .shadow(
+                    color: Color.black.opacity(isExpanded ? 0.6 : (isHovered ? 0.4 : 0.25)),
+                    radius: isExpanded ? 16 : 8,
+                    x: 0,
+                    y: isExpanded ? 8 : 4
+                )
                 .frame(width: pillWidth, height: pillHeight)
             
             // Content
-            if controller.isExpanded {
+            if isExpanded {
                 NotchExpandedView(onClose: {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        controller.setExpanded(false)
+                        isExpanded = false
                     }
                 })
                 .frame(width: 390, height: 200)
@@ -107,14 +112,17 @@ public struct NotchContentView: View {
                 }
                 .onTapGesture {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        controller.setExpanded(true)
+                        isExpanded = true
                     }
                     SoundManager.shared.play(.haptic)
                 }
             }
         }
         .frame(width: pillWidth, height: pillHeight, alignment: .top)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: controller.isExpanded)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
         .animation(.spring(response: 0.28, dampingFraction: 0.75), value: isHovered)
+        .onChange(of: isExpanded) { expanded in
+            NotchController.shared.setExpanded(expanded)
+        }
     }
 }

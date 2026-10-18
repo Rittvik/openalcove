@@ -57,6 +57,10 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
 	<string>OpenAlcove needs permission to show connected AirPods and battery levels.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>OpenAlcove needs permission to display your upcoming calendar meetings.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
 </dict>
 </plist>
 EOF

@@ -1,6 +1,9 @@
 import AppKit
 
+final class MainHolder {
+    static let delegate = AppDelegate()
+}
+
 let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
+app.delegate = MainHolder.delegate
 app.run()

@@ -9,13 +9,15 @@ public final class MediaManager: ObservableObject {
     @Published public var hasActiveMedia: Bool = false
     
     private init() {
-        MediaRemoteBridge.shared.onTrackChanged = { [weak self] newTrack in
-            DispatchQueue.main.async {
-                self?.track = newTrack
-                self?.hasActiveMedia = !newTrack.title.isEmpty
+        DispatchQueue.main.async { [weak self] in
+            MediaRemoteBridge.shared.onTrackChanged = { [weak self] newTrack in
+                DispatchQueue.main.async {
+                    self?.track = newTrack
+                    self?.hasActiveMedia = !newTrack.title.isEmpty
+                }
             }
+            MediaRemoteBridge.shared.updateNowPlaying()
         }
-        MediaRemoteBridge.shared.updateNowPlaying()
     }
     
     public var progress: Double {

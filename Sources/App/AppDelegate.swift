@@ -6,6 +6,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // Prevent AppKit from automatically terminating this background agent
+        ProcessInfo.processInfo.disableAutomaticTermination("OpenAlcove daemon")
+        
         // Hide dock icon (LSUIElement behavior)
         NSApp.setActivationPolicy(.accessory)
         
@@ -14,6 +17,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup Menu Bar Status Item
         setupStatusBar()
+    }
+    
+    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
     }
     
     private func setupStatusBar() {

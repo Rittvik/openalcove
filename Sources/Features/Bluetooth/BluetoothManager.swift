@@ -21,13 +21,20 @@ public final class BluetoothManager: ObservableObject {
     private var lastConnectedDeviceName: String?
     private var dismissTimer: Timer?
     private var pollTimer: Timer?
+    private var isQuerying = false
     
     private init() {
-        checkConnectedDevices()
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.checkConnectedDevices()
+        }
         startMonitoring()
     }
     
     public func checkConnectedDevices() {
+        guard !isQuerying else { return }
+        isQuerying = true
+        defer { isQuerying = false }
+        
         guard let devices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else { return }
         
         var activeDevice: ConnectedAudioDevice? = nil
@@ -42,20 +49,20 @@ public final class BluetoothManager: ObservableObject {
                     id: dev.addressString ?? name,
                     name: name,
                     isAirPods: isAirPods,
-                    leftBattery: 73,
-                    rightBattery: 76,
+                    leftBattery: 75,
+                    rightBattery: 75,
                     caseBattery: 50,
                     singleBattery: nil
                 )
                 
-                // Read actual battery if available via system_profiler or IORegistry
                 readLiveBattery(for: dev, device: &device)
                 activeDevice = device
                 break
             }
         }
         
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
             if let dev = activeDevice {
                 if self.lastConnectedDeviceName != dev.name {
                     self.lastConnectedDeviceName = dev.name
@@ -70,7 +77,6 @@ public final class BluetoothManager: ObservableObject {
     }
     
     private func readLiveBattery(for dev: IOBluetoothDevice, device: inout ConnectedAudioDevice) {
-        // Query IORegistry or system profile
         let pipe = Pipe()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
@@ -100,7 +106,7 @@ public final class BluetoothManager: ObservableObject {
             }
             if insideDevice {
                 if line.contains("Address:") && !line.contains(device.id) {
-                    break // Next device
+                    break
                 }
                 if line.contains("Left Battery Level:") {
                     let parts = line.components(separatedBy: ":")

@@ -9,7 +9,7 @@ public struct TrackInfo: Equatable {
     public var duration: Double
     public var elapsedTime: Double
     public var isPlaying: Bool
-    public var source: String // "spotify", "music", "mediaremote"
+    public var source: String
     
     public init(
         title: String = "",
@@ -50,10 +50,14 @@ public final class MediaRemoteBridge {
     public var currentTrack = TrackInfo()
     private var pollTimer: Timer?
     private var lastArtworkURL: String?
+    private var isChecking = false
     
     private init() {
         loadFramework()
-        startObserving()
+        // Start observing asynchronously to prevent deadlock during init
+        DispatchQueue.main.async { [weak self] in
+            self?.startObserving()
+        }
     }
     
     private func loadFramework() {
@@ -81,25 +85,35 @@ public final class MediaRemoteBridge {
         // Initial fetch
         updateNowPlaying()
         
-        // Active polling every 1 second: keeps Now Playing accurate across all apps
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Active polling every 1.5 seconds on background thread
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             self?.updateNowPlaying()
         }
     }
     
     public func updateNowPlaying() {
-        // Priority 1: Check Spotify directly if active
-        if checkSpotify() {
-            return
-        }
+        guard !isChecking else { return }
+        isChecking = true
         
-        // Priority 2: Check Apple Music directly if active
-        if checkAppleMusic() {
-            return
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            defer { self.isChecking = false }
+            
+            // Priority 1: Check Spotify directly
+            if self.checkSpotify() {
+                return
+            }
+            
+            // Priority 2: Check Apple Music directly
+            if self.checkAppleMusic() {
+                return
+            }
+            
+            // Priority 3: MediaRemote framework (YouTube in Safari/Chrome, Podcasts, Web browsers)
+            DispatchQueue.main.async {
+                self.checkMediaRemote()
+            }
         }
-        
-        // Priority 3: MediaRemote framework (YouTube in Safari/Chrome, Podcasts, Web browsers)
-        checkMediaRemote()
     }
     
     private func checkSpotify() -> Bool {
@@ -141,31 +155,30 @@ public final class MediaRemoteBridge {
             var duration: Double = 0
             if parts.count >= 7 {
                 elapsed = Double(parts[5]) ?? 0
-                duration = (Double(parts[6]) ?? 0) / 1000.0 // Spotify duration is in ms
+                duration = (Double(parts[6]) ?? 0) / 1000.0
             }
             
-            self.currentTrack.title = title
-            self.currentTrack.artist = artist
-            self.currentTrack.album = album
-            self.currentTrack.isPlaying = isPlaying
-            self.currentTrack.elapsedTime = elapsed
-            self.currentTrack.duration = duration
-            self.currentTrack.source = "spotify"
-            
-            // Fetch artwork asynchronously if changed
+            var updatedArtwork = self.currentTrack.artwork
             if !artUrl.isEmpty && artUrl != self.lastArtworkURL {
                 self.lastArtworkURL = artUrl
-                DispatchQueue.global(qos: .utility).async { [weak self] in
-                    if let url = URL(string: artUrl), let data = try? Data(contentsOf: url), let img = NSImage(data: data) {
-                        DispatchQueue.main.async {
-                            self?.currentTrack.artwork = img
-                            self?.notifyChange()
-                        }
-                    }
+                if let url = URL(string: artUrl), let data = try? Data(contentsOf: url), let img = NSImage(data: data) {
+                    updatedArtwork = img
                 }
             }
             
-            notifyChange()
+            DispatchQueue.main.async {
+                self.currentTrack.title = title
+                self.currentTrack.artist = artist
+                self.currentTrack.album = album
+                self.currentTrack.isPlaying = isPlaying
+                self.currentTrack.elapsedTime = elapsed
+                self.currentTrack.duration = duration
+                self.currentTrack.source = "spotify"
+                if updatedArtwork != nil {
+                    self.currentTrack.artwork = updatedArtwork
+                }
+                self.notifyChange()
+            }
             return true
         }
         return false
@@ -212,15 +225,16 @@ public final class MediaRemoteBridge {
                 duration = Double(parts[5]) ?? 0
             }
             
-            self.currentTrack.title = title
-            self.currentTrack.artist = artist
-            self.currentTrack.album = album
-            self.currentTrack.isPlaying = isPlaying
-            self.currentTrack.elapsedTime = elapsed
-            self.currentTrack.duration = duration
-            self.currentTrack.source = "music"
-            
-            notifyChange()
+            DispatchQueue.main.async {
+                self.currentTrack.title = title
+                self.currentTrack.artist = artist
+                self.currentTrack.album = album
+                self.currentTrack.isPlaying = isPlaying
+                self.currentTrack.elapsedTime = elapsed
+                self.currentTrack.duration = duration
+                self.currentTrack.source = "music"
+                self.notifyChange()
+            }
             return true
         }
         return false
@@ -254,7 +268,6 @@ public final class MediaRemoteBridge {
                 
                 self.notifyChange()
             } else if self.currentTrack.source == "mediaremote" {
-                // Cleared
                 self.currentTrack = TrackInfo()
                 self.notifyChange()
             }
@@ -280,43 +293,53 @@ public final class MediaRemoteBridge {
     }
     
     public func togglePlayPause() {
-        if currentTrack.source == "spotify" {
-            _ = runAppleScript("tell application \"Spotify\" to playpause")
-        } else if currentTrack.source == "music" {
-            _ = runAppleScript("tell application \"Music\" to playpause")
-        } else {
-            _ = sendCommand?(2, nil) // 2 = kMRTogglePlayPause
-        }
         currentTrack.isPlaying.toggle()
         notifyChange()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.updateNowPlaying()
+        
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            guard let self = self else { return }
+            if self.currentTrack.source == "spotify" {
+                _ = self.runAppleScript("tell application \"Spotify\" to playpause")
+            } else if self.currentTrack.source == "music" {
+                _ = self.runAppleScript("tell application \"Music\" to playpause")
+            } else {
+                _ = self.sendCommand?(2, nil) // 2 = kMRTogglePlayPause
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.updateNowPlaying()
+            }
         }
     }
     
     public func nextTrack() {
-        if currentTrack.source == "spotify" {
-            _ = runAppleScript("tell application \"Spotify\" to next track")
-        } else if currentTrack.source == "music" {
-            _ = runAppleScript("tell application \"Music\" to next track")
-        } else {
-            _ = sendCommand?(4, nil) // 4 = kMRNextTrack
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.updateNowPlaying()
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            guard let self = self else { return }
+            if self.currentTrack.source == "spotify" {
+                _ = self.runAppleScript("tell application \"Spotify\" to next track")
+            } else if self.currentTrack.source == "music" {
+                _ = self.runAppleScript("tell application \"Music\" to next track")
+            } else {
+                _ = self.sendCommand?(4, nil) // 4 = kMRNextTrack
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.updateNowPlaying()
+            }
         }
     }
     
     public func previousTrack() {
-        if currentTrack.source == "spotify" {
-            _ = runAppleScript("tell application \"Spotify\" to previous track")
-        } else if currentTrack.source == "music" {
-            _ = runAppleScript("tell application \"Music\" to previous track")
-        } else {
-            _ = sendCommand?(5, nil) // 5 = kMRPreviousTrack
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.updateNowPlaying()
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            guard let self = self else { return }
+            if self.currentTrack.source == "spotify" {
+                _ = self.runAppleScript("tell application \"Spotify\" to previous track")
+            } else if self.currentTrack.source == "music" {
+                _ = self.runAppleScript("tell application \"Music\" to previous track")
+            } else {
+                _ = self.sendCommand?(5, nil) // 5 = kMRPreviousTrack
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.updateNowPlaying()
+            }
         }
     }
 }
