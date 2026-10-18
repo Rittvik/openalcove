@@ -136,8 +136,5 @@ public struct NotchContentView: View {
         .frame(width: pillWidth, height: pillHeight, alignment: .top)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: controller.isExpanded)
         .animation(.spring(response: 0.28, dampingFraction: 0.75), value: controller.isHovered)
-        .onHover { hovering in
-            controller.handleHover(hovering)
-        }
     }
 }

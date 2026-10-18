@@ -52,7 +52,14 @@ public final class HoverTrackingHostingView<Content: View>: NSHostingView<Conten
     
     public override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        NotchController.shared.handleHover(true)
+        let pt = convert(event.locationInWindow, from: nil)
+        NotchController.shared.handleHover(true, point: pt)
+    }
+    
+    public override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let pt = convert(event.locationInWindow, from: nil)
+        NotchController.shared.handleHover(true, point: pt)
     }
     
     public override func mouseExited(with event: NSEvent) {
@@ -68,6 +75,7 @@ public final class NotchController: ObservableObject {
     @Published public var isExpanded: Bool = false
     @Published public var isHovered: Bool = false
     
+    private var expandWorkItem: DispatchWorkItem?
     private var collapseWorkItem: DispatchWorkItem?
     
     private init() {}
@@ -80,8 +88,8 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         
         let metrics = ScreenGeometryManager.shared.currentMetrics
-        let initialWidth: CGFloat = max(metrics.physicalWidth + 180, 400)
-        let initialHeight: CGFloat = metrics.physicalHeight + 16
+        let initialWidth: CGFloat = metrics.physicalWidth + 150
+        let initialHeight: CGFloat = metrics.physicalHeight
         
         let rect = NSRect(
             x: centerX - (initialWidth / 2.0),
@@ -106,24 +114,64 @@ public final class NotchController: ObservableObject {
         }
     }
     
-    public func handleHover(_ hovering: Bool) {
+    public func handleHover(_ hovering: Bool, point: NSPoint? = nil) {
         if hovering {
             collapseWorkItem?.cancel()
             collapseWorkItem = nil
+            
+            // If already expanded, stay expanded
+            if isExpanded {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    self.isHovered = true
+                }
+                return
+            }
+            
+            // Check if cursor point is strictly inside the visible notch pill bounds
+            if let pt = point, let panel = panel {
+                let metrics = ScreenGeometryManager.shared.currentMetrics
+                let pillWidth: CGFloat = metrics.physicalWidth + 150
+                let pillHeight: CGFloat = metrics.physicalHeight
+                let bounds = panel.contentView?.bounds ?? .zero
+                let pillRect = NSRect(
+                    x: (bounds.width - pillWidth) / 2.0,
+                    y: bounds.height - pillHeight,
+                    width: pillWidth,
+                    height: pillHeight
+                )
+                // Reject hover events that fall outside the visible notch pill
+                guard pillRect.contains(pt) else {
+                    expandWorkItem?.cancel()
+                    expandWorkItem = nil
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                        self.isHovered = false
+                    }
+                    return
+                }
+            }
             
             withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                 self.isHovered = true
             }
             
-            if !isExpanded {
-                setExpanded(true)
+            // Require mouse to intentionally dwell inside the notch for 0.20s before expanding
+            if expandWorkItem == nil && !isExpanded {
+                let workItem = DispatchWorkItem { [weak self] in
+                    guard let self = self, self.isHovered, !self.isExpanded else { return }
+                    self.setExpanded(true)
+                }
+                self.expandWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20, execute: workItem)
             }
         } else {
+            expandWorkItem?.cancel()
+            expandWorkItem = nil
+            
             withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
                 self.isHovered = false
             }
             
-            // Debounce collapse by 0.45s so accidental cursor slip doesn't snap notch shut
+            // Debounce collapse by 0.40s so accidental cursor slip doesn't snap notch shut
             collapseWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
@@ -132,7 +180,7 @@ public final class NotchController: ObservableObject {
                 }
             }
             collapseWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.40, execute: workItem)
         }
     }
     
@@ -142,6 +190,8 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         
         if expanded {
+            expandWorkItem?.cancel()
+            expandWorkItem = nil
             collapseWorkItem?.cancel()
             collapseWorkItem = nil
             
@@ -168,8 +218,8 @@ public final class NotchController: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
                 guard let self = self, !self.isExpanded, let panel = self.panel, let screen = NSScreen.main else { return }
                 let metrics = ScreenGeometryManager.shared.currentMetrics
-                let width: CGFloat = max(metrics.physicalWidth + 180, 400)
-                let height: CGFloat = metrics.physicalHeight + 16
+                let width: CGFloat = metrics.physicalWidth + 150
+                let height: CGFloat = metrics.physicalHeight
                 let rect = NSRect(
                     x: screen.frame.midX - (width / 2.0),
                     y: screen.frame.maxY - height,
@@ -187,8 +237,8 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         let metrics = ScreenGeometryManager.shared.currentMetrics
         
-        let width: CGFloat = isExpanded ? 560 : max(metrics.physicalWidth + 180, 400)
-        let height: CGFloat = isExpanded ? 260 : metrics.physicalHeight + 16
+        let width: CGFloat = isExpanded ? 560 : metrics.physicalWidth + 150
+        let height: CGFloat = isExpanded ? 260 : metrics.physicalHeight
         
         let rect = NSRect(
             x: centerX - (width / 2.0),
