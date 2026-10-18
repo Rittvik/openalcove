@@ -1,0 +1,22 @@
+# Xcode & Swift
+.build/
+DerivedData/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Binaries & Archives
+*.dmg
+Alcove.dmg
+Alcove.app
+OpenAlcove.app
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Logs & Temp
+*.log
+scratch/
