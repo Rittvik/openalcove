@@ -80,7 +80,7 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         
         let metrics = ScreenGeometryManager.shared.currentMetrics
-        let initialWidth: CGFloat = max(metrics.physicalWidth + 140, 360)
+        let initialWidth: CGFloat = max(metrics.physicalWidth + 180, 400)
         let initialHeight: CGFloat = metrics.physicalHeight + 16
         
         let rect = NSRect(
@@ -168,7 +168,7 @@ public final class NotchController: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
                 guard let self = self, !self.isExpanded, let panel = self.panel, let screen = NSScreen.main else { return }
                 let metrics = ScreenGeometryManager.shared.currentMetrics
-                let width: CGFloat = max(metrics.physicalWidth + 140, 360)
+                let width: CGFloat = max(metrics.physicalWidth + 180, 400)
                 let height: CGFloat = metrics.physicalHeight + 16
                 let rect = NSRect(
                     x: screen.frame.midX - (width / 2.0),
@@ -187,7 +187,7 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         let metrics = ScreenGeometryManager.shared.currentMetrics
         
-        let width: CGFloat = isExpanded ? 560 : max(metrics.physicalWidth + 140, 360)
+        let width: CGFloat = isExpanded ? 560 : max(metrics.physicalWidth + 180, 400)
         let height: CGFloat = isExpanded ? 240 : metrics.physicalHeight + 16
         
         let rect = NSRect(

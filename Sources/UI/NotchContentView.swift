@@ -50,9 +50,9 @@ public struct NotchContentView: View {
             return 520
         }
         if controller.isHovered {
-            return notchW + 125
+            return notchW + 165
         }
-        return notchW + 110
+        return notchW + 150
     }
     
     private var pillHeight: CGFloat {

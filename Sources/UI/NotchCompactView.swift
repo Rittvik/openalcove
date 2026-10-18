@@ -57,11 +57,13 @@ public struct NotchCompactView: View {
                     // Idle: Show Time
                     Text(currentTime)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundColor(.white.opacity(0.9))
                 }
             }
-            .frame(width: 48, alignment: .leading)
-            .padding(.leading, 10)
+            .frame(width: 64, alignment: .leading)
+            .padding(.leading, 12)
             
             // Gap for the hardware notch camera
             Spacer()
@@ -77,7 +79,7 @@ public struct NotchCompactView: View {
                                 .frame(width: geo.size.width * CGFloat(volume.volume))
                         }
                     }
-                    .frame(width: 42, height: 4)
+                    .frame(width: 48, height: 4)
                 } else if brightness.isHUDVisible {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -86,11 +88,13 @@ public struct NotchCompactView: View {
                                 .frame(width: geo.size.width * CGFloat(brightness.brightness))
                         }
                     }
-                    .frame(width: 42, height: 4)
+                    .frame(width: 48, height: 4)
                 } else if battery.isChargingHUDVisible {
                     HStack(spacing: 2) {
                         Text("\(battery.batteryPercentage)%")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                            .fixedSize()
                             .foregroundColor(.green)
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9, weight: .bold))
@@ -99,6 +103,8 @@ public struct NotchCompactView: View {
                 } else if bluetooth.isDeviceBannerVisible {
                     Text("AirPods")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundColor(.white.opacity(0.9))
                 } else if media.hasActiveMedia && media.track.isPlaying {
                     WaveformView(
@@ -108,10 +114,12 @@ public struct NotchCompactView: View {
                         maxHeight: 12
                     )
                 } else {
-                    // Idle: Show Battery Percentage and Gauge
+                    // Idle: Show Battery Percentage and Gauge in single line
                     HStack(spacing: 3) {
                         Text("\(battery.batteryPercentage)%")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                            .fixedSize()
                             .foregroundColor(battery.batteryPercentage < 20 ? .red : .white.opacity(0.85))
                         
                         Image(systemName: battery.isCharging ? "battery.100.bolt" : batteryIconName(for: battery.batteryPercentage))
@@ -120,8 +128,8 @@ public struct NotchCompactView: View {
                     }
                 }
             }
-            .frame(width: 48, alignment: .trailing)
-            .padding(.trailing, 10)
+            .frame(width: 64, alignment: .trailing)
+            .padding(.trailing, 12)
         }
         .frame(height: notchHeight)
         .onReceive(clockTimer) { _ in
