@@ -39,6 +39,14 @@ public final class AppSettings: ObservableObject {
     @Published public var useSystemAccentColor: Bool {
         didSet { defaults.set(useSystemAccentColor, forKey: "useSystemAccentColor") }
     }
+    @Published public var hideWingsBehindNotch: Bool {
+        didSet {
+            defaults.set(hideWingsBehindNotch, forKey: "hideWingsBehindNotch")
+            DispatchQueue.main.async {
+                NotchController.shared.reposition()
+            }
+        }
+    }
     
     public let isFreeAndUnlimitedForever: Bool = true
     
@@ -53,6 +61,7 @@ public final class AppSettings: ObservableObject {
         self.shelfEnabled = defaults.object(forKey: "shelfEnabled") as? Bool ?? true
         self.virtualNotchOnExternalDisplays = defaults.object(forKey: "virtualNotchOnExternalDisplays") as? Bool ?? false
         self.useSystemAccentColor = defaults.object(forKey: "useSystemAccentColor") as? Bool ?? true
+        self.hideWingsBehindNotch = defaults.object(forKey: "hideWingsBehindNotch") as? Bool ?? false
         
         SoundManager.shared.isSoundEnabled = self.soundEffectsEnabled
     }

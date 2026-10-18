@@ -36,6 +36,7 @@ public struct SettingsView: View {
         Form {
             Section("Display & Layout") {
                 Toggle("Enable Notch Island", isOn: $settings.isNotchEnabled)
+                Toggle("Hide Wings Behind Physical Notch (Stealth Mode)", isOn: $settings.hideWingsBehindNotch)
                 Toggle("Compact Wings (show mini waveform & artwork)", isOn: $settings.compactMode)
                 Toggle("Simulate Notch on External Displays", isOn: $settings.virtualNotchOnExternalDisplays)
             }

@@ -80,6 +80,10 @@ public final class NotchController: ObservableObject {
     
     private init() {}
     
+    public func collapsedWidth(for metrics: NotchMetrics) -> CGFloat {
+        AppSettings.shared.hideWingsBehindNotch ? metrics.physicalWidth : (metrics.physicalWidth + 150)
+    }
+    
     public func start() {
         guard panel == nil else { return }
         
@@ -88,7 +92,7 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         
         let metrics = ScreenGeometryManager.shared.currentMetrics
-        let initialWidth: CGFloat = metrics.physicalWidth + 150
+        let initialWidth: CGFloat = collapsedWidth(for: metrics)
         let initialHeight: CGFloat = metrics.physicalHeight
         
         let rect = NSRect(
@@ -130,7 +134,7 @@ public final class NotchController: ObservableObject {
             // Check if cursor point is strictly inside the visible notch pill bounds
             if let pt = point, let panel = panel {
                 let metrics = ScreenGeometryManager.shared.currentMetrics
-                let pillWidth: CGFloat = metrics.physicalWidth + 150
+                let pillWidth: CGFloat = collapsedWidth(for: metrics)
                 let pillHeight: CGFloat = metrics.physicalHeight
                 let bounds = panel.contentView?.bounds ?? .zero
                 let pillRect = NSRect(
@@ -218,7 +222,7 @@ public final class NotchController: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
                 guard let self = self, !self.isExpanded, let panel = self.panel, let screen = NSScreen.main else { return }
                 let metrics = ScreenGeometryManager.shared.currentMetrics
-                let width: CGFloat = metrics.physicalWidth + 150
+                let width: CGFloat = self.collapsedWidth(for: metrics)
                 let height: CGFloat = metrics.physicalHeight
                 let rect = NSRect(
                     x: screen.frame.midX - (width / 2.0),
@@ -237,7 +241,7 @@ public final class NotchController: ObservableObject {
         let centerX = screen.frame.midX
         let metrics = ScreenGeometryManager.shared.currentMetrics
         
-        let width: CGFloat = isExpanded ? 560 : metrics.physicalWidth + 150
+        let width: CGFloat = isExpanded ? 560 : collapsedWidth(for: metrics)
         let height: CGFloat = isExpanded ? 260 : metrics.physicalHeight
         
         let rect = NSRect(

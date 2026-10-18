@@ -49,6 +49,9 @@ public struct NotchContentView: View {
         if controller.isExpanded {
             return 520
         }
+        if settings.hideWingsBehindNotch {
+            return controller.isHovered ? notchW + 10 : notchW
+        }
         if controller.isHovered {
             return notchW + 165
         }

@@ -7,6 +7,7 @@ public struct NotchCompactView: View {
     @ObservedObject var brightness = BrightnessManager.shared
     @ObservedObject var battery = BatteryManager.shared
     @ObservedObject var bluetooth = BluetoothManager.shared
+    @ObservedObject var settings = AppSettings.shared
     
     public let notchWidth: CGFloat
     public let notchHeight: CGFloat
@@ -21,7 +22,13 @@ public struct NotchCompactView: View {
     }
     
     public var body: some View {
-        HStack(spacing: 0) {
+        Group {
+            if settings.hideWingsBehindNotch {
+                // Sits completely behind the physical notch: invisible during collapsed idle
+                Color.clear
+                    .frame(width: notchWidth, height: notchHeight)
+            } else {
+                HStack(spacing: 0) {
             // MARK: - Left Wing
             HStack(spacing: 6) {
                 if volume.isHUDVisible {
@@ -132,6 +139,8 @@ public struct NotchCompactView: View {
             .padding(.trailing, 12)
         }
         .frame(height: notchHeight)
+        }
+        }
         .onReceive(clockTimer) { _ in
             currentTime = NotchCompactView.formattedCurrentTime()
         }

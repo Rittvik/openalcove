@@ -257,10 +257,10 @@ public struct NotchExpandedView: View {
                 .accentColor(settings.useSystemAccentColor ? accentColor : .yellow)
             }
             
-            // Battery Status & Accent Color Quick Switch
+            // Quick Switches: Accent Color & Hide Behind Notch
             HStack(spacing: 8) {
                 HStack {
-                    Label("Follow Accent Color", systemImage: "paintpalette.fill")
+                    Label("Accent Colors", systemImage: "paintpalette.fill")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(settings.useSystemAccentColor ? accentColor : .white.opacity(0.8))
                     Spacer()
@@ -274,18 +274,33 @@ public struct NotchExpandedView: View {
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
                 
                 HStack {
-                    Label(battery.timeRemainingString, systemImage: battery.isCharging ? "bolt.fill" : "battery.100")
+                    Label("Hide Behind Notch", systemImage: "eye.slash.fill")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(battery.isCharging ? .green : .white.opacity(0.8))
+                        .foregroundColor(settings.hideWingsBehindNotch ? (settings.useSystemAccentColor ? accentColor : .green) : .white.opacity(0.8))
                     Spacer()
-                    Text("\(battery.batteryPercentage)%")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(battery.isCharging ? .green : .white)
+                    Toggle("", isOn: $settings.hideWingsBehindNotch)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .scaleEffect(0.65)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
             }
+            
+            // Battery Status
+            HStack {
+                Label(battery.timeRemainingString, systemImage: battery.isCharging ? "bolt.fill" : "battery.100")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(battery.isCharging ? .green : .white.opacity(0.8))
+                Spacer()
+                Text("\(battery.batteryPercentage)%")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(battery.isCharging ? .green : .white)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
         }
     }
     
