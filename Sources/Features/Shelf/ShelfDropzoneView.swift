@@ -48,12 +48,15 @@ public struct ShelfDropzoneView: View {
                     .foregroundColor(.white.opacity(0.8))
                 Spacer()
                 if !shelf.items.isEmpty {
-                    Button(action: { shelf.clear() }) {
+                    Button(action: {
+                        shelf.clear()
+                        SoundManager.shared.playHapticIfEnabled()
+                    }) {
                         Text("Clear All")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10, weight: .medium, design: .default))
                             .foregroundColor(.white.opacity(0.6))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ApplePressableButtonStyle(scale: 0.94, pressedOpacity: 0.8))
                 }
             }
             .padding(.horizontal, 4)
@@ -117,7 +120,7 @@ public struct ShelfDropzoneView: View {
             }
             group.notify(queue: .main) {
                 shelf.add(urls: urls)
-                SoundManager.shared.play(.haptic)
+                SoundManager.shared.playHapticIfEnabled()
             }
             return true
         }

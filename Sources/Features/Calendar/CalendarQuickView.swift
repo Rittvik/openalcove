@@ -43,12 +43,16 @@ public struct CalendarQuickView: View {
             Spacer()
             
             Text(currentDate, format: .dateTime.hour().minute())
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .font(.system(size: 16, weight: .semibold, design: .default))
+                .monospacedDigit()
                 .foregroundColor(.white.opacity(0.85))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.05)))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
         .onReceive(timer) { input in
             currentDate = input
         }

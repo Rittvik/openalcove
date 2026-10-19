@@ -63,7 +63,7 @@ public struct SettingsView: View {
     
     private var soundTab: some View {
         Form {
-            Section {
+            Section("Audio Feedback") {
                 Toggle("Enable Sound Effects", isOn: $settings.soundEffectsEnabled)
                 
                 if settings.soundEffectsEnabled {
@@ -71,15 +71,28 @@ public struct SettingsView: View {
                         get: { Double(sound.volume) },
                         set: { sound.volume = Float($0) }
                     ), in: 0...1) {
-                        Text("Effect Volume")
+                        Text("Effects Volume")
                     }
-                    
-                    HStack {
-                        Button("Test Volume Tick") { sound.play(.volume) }
-                        Button("Test Charging Chime") { sound.play(.chime) }
-                        Button("Test Haptic Pop") { sound.play(.haptic) }
+                }
+            }
+            
+            Section("Notch Haptics") {
+                Toggle("Haptic Pop When Notch is Active", isOn: $settings.notchHapticsEnabled)
+                    .disabled(!settings.soundEffectsEnabled)
+                
+                Text("Plays a subtle tactile pop sound when hovering, clicking, or expanding the notch.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            
+            if settings.soundEffectsEnabled {
+                Section("Preview") {
+                    HStack(spacing: 10) {
+                        Button("Volume Tick") { sound.play(.volume) }
+                        Button("Charging Chime") { sound.play(.chime) }
+                        Button("Haptic Pop") { sound.play(.haptic) }
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 2)
                 }
             }
         }

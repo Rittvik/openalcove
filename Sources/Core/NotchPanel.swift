@@ -77,6 +77,7 @@ public final class NotchController: ObservableObject {
     
     private var expandWorkItem: DispatchWorkItem?
     private var collapseWorkItem: DispatchWorkItem?
+    private var resizeWorkItem: DispatchWorkItem?
     
     private init() {}
     
@@ -122,10 +123,12 @@ public final class NotchController: ObservableObject {
         if hovering {
             collapseWorkItem?.cancel()
             collapseWorkItem = nil
+            resizeWorkItem?.cancel()
+            resizeWorkItem = nil
             
             // If already expanded, stay expanded
             if isExpanded {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
                     self.isHovered = true
                 }
                 return
@@ -147,35 +150,35 @@ public final class NotchController: ObservableObject {
                 guard pillRect.contains(pt) else {
                     expandWorkItem?.cancel()
                     expandWorkItem = nil
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
                         self.isHovered = false
                     }
                     return
                 }
             }
             
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
                 self.isHovered = true
             }
             
-            // Require mouse to intentionally dwell inside the notch for 0.20s before expanding
+            // Require mouse to intentionally dwell inside the notch for 0.18s before expanding
             if expandWorkItem == nil && !isExpanded {
                 let workItem = DispatchWorkItem { [weak self] in
                     guard let self = self, self.isHovered, !self.isExpanded else { return }
                     self.setExpanded(true)
                 }
                 self.expandWorkItem = workItem
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.20, execute: workItem)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18, execute: workItem)
             }
         } else {
             expandWorkItem?.cancel()
             expandWorkItem = nil
             
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
                 self.isHovered = false
             }
             
-            // Debounce collapse by 0.40s so accidental cursor slip doesn't snap notch shut
+            // Debounce collapse by 0.35s so accidental cursor slip doesn't snap notch shut
             collapseWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self = self else { return }
@@ -184,7 +187,7 @@ public final class NotchController: ObservableObject {
                 }
             }
             collapseWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.40, execute: workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
         }
     }
     
@@ -193,12 +196,14 @@ public final class NotchController: ObservableObject {
         let topY = screen.frame.maxY
         let centerX = screen.frame.midX
         
+        expandWorkItem?.cancel()
+        expandWorkItem = nil
+        collapseWorkItem?.cancel()
+        collapseWorkItem = nil
+        resizeWorkItem?.cancel()
+        resizeWorkItem = nil
+        
         if expanded {
-            expandWorkItem?.cancel()
-            expandWorkItem = nil
-            collapseWorkItem?.cancel()
-            collapseWorkItem = nil
-            
             let width: CGFloat = 560
             let height: CGFloat = 260
             let rect = NSRect(
@@ -207,19 +212,19 @@ public final class NotchController: ObservableObject {
                 width: width,
                 height: height
             )
-            // Expand window frame first so animation has room
+            // Expand window frame immediately so animation has room
             panel.setFrame(rect, display: true, animate: false)
             
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
                 self.isExpanded = true
             }
         } else {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                 self.isExpanded = false
             }
             
-            // Shrink window after pill animation completes to avoid clipping
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            // Shrink window after pill animation completes, fully interruptible if re-opened
+            let resizeItem = DispatchWorkItem { [weak self] in
                 guard let self = self, !self.isExpanded, let panel = self.panel, let screen = NSScreen.main else { return }
                 let metrics = ScreenGeometryManager.shared.currentMetrics
                 let width: CGFloat = self.collapsedWidth(for: metrics)
@@ -232,6 +237,8 @@ public final class NotchController: ObservableObject {
                 )
                 panel.setFrame(rect, display: true, animate: false)
             }
+            self.resizeWorkItem = resizeItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32, execute: resizeItem)
         }
     }
     

@@ -76,6 +76,11 @@ public final class SoundManager: ObservableObject {
             }
         }
     }
+    
+    public func playHapticIfEnabled() {
+        guard isSoundEnabled && AppSettings.shared.notchHapticsEnabled else { return }
+        play(.haptic)
+    }
 }
 
 extension Bundle {

@@ -5,6 +5,15 @@ public enum ExpandedTab: String, CaseIterable {
     case controls = "Controls"
     case airpods = "AirPods"
     case shelf = "Drop Shelf"
+    
+    var icon: String {
+        switch self {
+        case .media: return "music.note"
+        case .controls: return "slider.horizontal.3"
+        case .airpods: return "airpodspro"
+        case .shelf: return "tray.and.arrow.down.fill"
+        }
+    }
 }
 
 public struct NotchExpandedView: View {
@@ -18,6 +27,7 @@ public struct NotchExpandedView: View {
     @ObservedObject var settings = AppSettings.shared
     
     @State private var selectedTab: ExpandedTab = .media
+    @Namespace private var tabNamespace
     public var onClose: () -> Void
     
     public init(onClose: @escaping () -> Void) {
@@ -28,50 +38,64 @@ public struct NotchExpandedView: View {
         let accentColor = Color(nsColor: .controlAccentColor)
         
         VStack(spacing: 8) {
-            // Hardware Notch Clearance: Drops entire card down below the physical camera housing
+            // Hardware Notch Clearance: Drops entire card down below physical camera housing
             Spacer()
                 .frame(height: max(geometry.currentMetrics.physicalHeight, 38) + 6)
             
-            // MARK: - Header Bar & Tab Switcher
+            // MARK: - Header Bar & Apple Segmented Control
             HStack(spacing: 8) {
-                HStack(spacing: 4) {
+                HStack(spacing: 2) {
                     ForEach(ExpandedTab.allCases, id: \.self) { tab in
                         Button(action: {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                                 selectedTab = tab
                             }
-                            SoundManager.shared.play(.haptic)
+                            SoundManager.shared.playHapticIfEnabled()
                         }) {
-                            Text(tab.rawValue)
-                                .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .medium, design: .rounded))
-                                .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.45))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(
-                                    selectedTab == tab
-                                        ? RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(settings.useSystemAccentColor ? accentColor.opacity(0.35) : Color.white.opacity(0.16))
-                                        : RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.clear)
-                                )
+                            HStack(spacing: 4.5) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(tab.rawValue)
+                                    .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .medium, design: .default))
+                            }
+                            .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.50))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4.5)
+                            .background {
+                                if selectedTab == tab {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(settings.useSystemAccentColor ? accentColor.opacity(0.35) : Color.white.opacity(0.18))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .stroke(settings.useSystemAccentColor ? accentColor.opacity(0.50) : Color.white.opacity(0.12), lineWidth: 0.5)
+                                        )
+                                        .matchedGeometryEffect(id: "activeTabIndicator", in: tabNamespace)
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(ApplePressableButtonStyle(scale: 0.95, pressedOpacity: 0.85))
                     }
                 }
+                .padding(2.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
                 
                 Spacer()
                 
                 Button(action: {
-                    SoundManager.shared.play(.haptic)
+                    SoundManager.shared.playHapticIfEnabled()
                     onClose()
                 }) {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(5)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 22, height: 22)
                         .background(Circle().fill(Color.white.opacity(0.12)))
+                        .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle(scale: 0.92, pressedOpacity: 0.8))
             }
             .padding(.horizontal, 16)
             
@@ -91,7 +115,7 @@ public struct NotchExpandedView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
         }
-        .frame(width: 520, height: 230, alignment: .top)
+        .frame(width: 520, height: 235, alignment: .top)
     }
     
     // MARK: - Media Player
@@ -100,14 +124,18 @@ public struct NotchExpandedView: View {
         
         return VStack(spacing: 8) {
             HStack(spacing: 12) {
-                // Artwork
+                // Artwork with continuous squircle corners & inner stroke
                 if let artwork = media.track.artwork {
                     Image(nsImage: artwork)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 52, height: 52)
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                        .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 3)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.5), radius: 6, x: 0, y: 3)
                 } else {
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(LinearGradient(
@@ -117,30 +145,35 @@ public struct NotchExpandedView: View {
                         ))
                         .frame(width: 52, height: 52)
                         .overlay(
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                        )
+                        .overlay(
                             Image(systemName: "music.note")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(.white)
                         )
+                        .shadow(color: .black.opacity(0.4), radius: 6, x: 0, y: 3)
                 }
                 
                 // Track details
                 VStack(alignment: .leading, spacing: 3) {
                     MarqueeText(
                         text: media.track.title.isEmpty ? "No Media Playing" : media.track.title,
-                        font: .system(size: 13, weight: .bold, design: .rounded),
+                        font: .system(size: 13, weight: .semibold, design: .default),
                         color: .white
                     )
                     
                     Text(media.track.artist.isEmpty ? (media.hasActiveMedia ? "Playing" : "Play music in Spotify, Music or Safari") : media.track.artist)
-                        .font(.system(size: 11, weight: .regular))
+                        .font(.system(size: 11, weight: .regular, design: .default))
                         .lineLimit(1)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.60))
                     
                     if !media.track.album.isEmpty {
                         Text(media.track.album)
-                            .font(.system(size: 9, weight: .regular))
+                            .font(.system(size: 9.5, weight: .regular, design: .default))
                             .lineLimit(1)
-                            .foregroundColor(.white.opacity(0.4))
+                            .foregroundColor(.white.opacity(0.40))
                     }
                 }
                 
@@ -160,57 +193,59 @@ public struct NotchExpandedView: View {
                     ZStack(alignment: .leading) {
                         Capsule()
                             .fill(Color.white.opacity(0.14))
-                            .frame(height: 3.5)
+                            .frame(height: 4)
                         Capsule()
                             .fill(settings.useSystemAccentColor ? accentColor : Color.white)
-                            .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(media.progress))), height: 3.5)
+                            .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(media.progress))), height: 4)
                     }
                 }
                 .frame(height: 5)
                 
                 HStack {
                     Text(media.formattedElapsed)
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.4))
+                        .font(.system(size: 9.5, weight: .medium, design: .default))
+                        .monospacedDigit()
+                        .foregroundColor(.white.opacity(0.45))
                     Spacer()
                     Text(media.formattedRemaining)
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.4))
+                        .font(.system(size: 9.5, weight: .medium, design: .default))
+                        .monospacedDigit()
+                        .foregroundColor(.white.opacity(0.45))
                 }
             }
             
-            // Controls
-            HStack(spacing: 34) {
+            // Playback Controls with tactile spring feedback
+            HStack(spacing: 36) {
                 Button(action: {
                     media.previous()
-                    SoundManager.shared.play(.haptic)
+                    SoundManager.shared.playHapticIfEnabled()
                 }) {
                     Image(systemName: "backward.fill")
                         .font(.system(size: 15))
                         .foregroundColor(.white.opacity(0.85))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle(scale: 0.90, pressedOpacity: 0.75))
                 
                 Button(action: {
                     media.togglePlayPause()
-                    SoundManager.shared.play(.haptic)
+                    SoundManager.shared.playHapticIfEnabled()
                 }) {
                     Image(systemName: media.track.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.system(size: 34))
                         .foregroundColor(.white)
-                        .shadow(color: settings.useSystemAccentColor ? accentColor.opacity(0.4) : .white.opacity(0.15), radius: 6)
+                        .shadow(color: settings.useSystemAccentColor ? accentColor.opacity(0.4) : .white.opacity(0.18), radius: 6)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle(scale: 0.92, pressedOpacity: 0.85))
                 
                 Button(action: {
                     media.next()
-                    SoundManager.shared.play(.haptic)
+                    SoundManager.shared.playHapticIfEnabled()
                 }) {
                     Image(systemName: "forward.fill")
                         .font(.system(size: 15))
                         .foregroundColor(.white.opacity(0.85))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ApplePressableButtonStyle(scale: 0.90, pressedOpacity: 0.75))
             }
             .padding(.top, 2)
         }
@@ -220,87 +255,91 @@ public struct NotchExpandedView: View {
     private var controlsSection: some View {
         let accentColor = Color(nsColor: .controlAccentColor)
         
-        return VStack(spacing: 8) {
-            // Volume
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Label("Volume", systemImage: volume.isMuted ? "speaker.slash.fill" : "speaker.wave.3.fill")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                    Spacer()
-                    Text("\(Int(volume.volume * 100))%")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                Slider(value: Binding(
+        return VStack(spacing: 7) {
+            // macOS Control Center Capsule Volume Slider
+            AppleControlSlider(
+                value: Binding(
                     get: { Double(volume.volume) },
                     set: { volume.setVolume(Float($0)) }
-                ), in: 0...1)
-                .accentColor(settings.useSystemAccentColor ? accentColor : .white)
-            }
+                ),
+                iconName: volume.isMuted ? "speaker.slash.fill" : (volume.volume > 0.6 ? "speaker.wave.3.fill" : (volume.volume > 0.2 ? "speaker.wave.2.fill" : "speaker.wave.1.fill")),
+                label: "Volume",
+                tintColor: settings.useSystemAccentColor ? accentColor : .white
+            )
             
-            // Brightness
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Label("Display Brightness", systemImage: "sun.max.fill")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                    Spacer()
-                    Text("\(Int(brightness.brightness * 100))%")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                Slider(value: Binding(
+            // macOS Control Center Capsule Display Brightness Slider
+            AppleControlSlider(
+                value: Binding(
                     get: { Double(brightness.brightness) },
                     set: { brightness.setBrightness(Float($0)) }
-                ), in: 0...1)
-                .accentColor(settings.useSystemAccentColor ? accentColor : .yellow)
-            }
+                ),
+                iconName: "sun.max.fill",
+                label: "Display Brightness",
+                tintColor: settings.useSystemAccentColor ? accentColor : .yellow
+            )
             
-            // Quick Switches: Accent Color & Hide Behind Notch
-            HStack(spacing: 8) {
-                HStack {
-                    Label("Accent Colors", systemImage: "paintpalette.fill")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(settings.useSystemAccentColor ? accentColor : .white.opacity(0.8))
-                    Spacer()
-                    Toggle("", isOn: $settings.useSystemAccentColor)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .scaleEffect(0.65)
+            // Quick Action Card Tiles: Accent Color, Stealth Mode & Haptic Pop Sound Toggle
+            HStack(spacing: 6) {
+                AppleActionTile(
+                    iconName: "paintpalette.fill",
+                    title: "Accent",
+                    subtitle: settings.useSystemAccentColor ? "System" : "Mono",
+                    isActive: settings.useSystemAccentColor,
+                    activeColor: accentColor
+                ) {
+                    settings.useSystemAccentColor.toggle()
+                    SoundManager.shared.playHapticIfEnabled()
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
                 
-                HStack {
-                    Label("Hide Behind Notch", systemImage: "eye.slash.fill")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(settings.hideWingsBehindNotch ? (settings.useSystemAccentColor ? accentColor : .green) : .white.opacity(0.8))
-                    Spacer()
-                    Toggle("", isOn: $settings.hideWingsBehindNotch)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .scaleEffect(0.65)
+                AppleActionTile(
+                    iconName: "eye.slash.fill",
+                    title: "Stealth",
+                    subtitle: settings.hideWingsBehindNotch ? "Hidden" : "Visible",
+                    isActive: settings.hideWingsBehindNotch,
+                    activeColor: .green
+                ) {
+                    settings.hideWingsBehindNotch.toggle()
+                    SoundManager.shared.playHapticIfEnabled()
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
+                
+                // USER REQUEST: Dedicated toggle to turn off haptic pop sound when notch is active
+                AppleActionTile(
+                    iconName: settings.notchHapticsEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                    title: "Haptic Pop",
+                    subtitle: settings.notchHapticsEnabled ? "Active" : "Muted",
+                    isActive: settings.notchHapticsEnabled,
+                    activeColor: settings.useSystemAccentColor ? accentColor : Color(red: 0.12, green: 0.84, blue: 0.38)
+                ) {
+                    settings.notchHapticsEnabled.toggle()
+                    if settings.notchHapticsEnabled {
+                        SoundManager.shared.play(.haptic)
+                    }
+                }
             }
             
-            // Battery Status
-            HStack {
-                Label(battery.timeRemainingString, systemImage: battery.isCharging ? "bolt.fill" : "battery.100")
-                    .font(.system(size: 10, weight: .medium))
+            // Battery Status Bar
+            HStack(spacing: 8) {
+                Image(systemName: battery.isCharging ? "bolt.fill" : "battery.100")
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(battery.isCharging ? .green : .white.opacity(0.8))
+                
+                Text(battery.timeRemainingString)
+                    .font(.system(size: 10, weight: .medium, design: .default))
+                    .foregroundColor(.white.opacity(0.8))
+                
                 Spacer()
+                
                 Text("\(battery.batteryPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.system(size: 10.5, weight: .bold, design: .default))
+                    .monospacedDigit()
                     .foregroundColor(battery.isCharging ? .green : .white)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
         }
     }
     
@@ -315,16 +354,20 @@ public struct NotchExpandedView: View {
                     
                     VStack(alignment: .leading, spacing: 1) {
                         Text(dev.name)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(.system(size: 12, weight: .semibold, design: .default))
                             .foregroundColor(.white)
-                        Text("Connected & Active")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.green)
+                        
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.green).frame(width: 5, height: 5)
+                            Text("Connected & Active")
+                                .font(.system(size: 9.5, weight: .medium, design: .default))
+                                .foregroundColor(.green)
+                        }
                     }
                     Spacer()
                 }
                 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     if let left = dev.leftBattery {
                         batteryPod(label: "Left", level: left, icon: "airpod.left")
                     }
@@ -341,8 +384,8 @@ public struct NotchExpandedView: View {
                         .font(.system(size: 22))
                         .foregroundColor(.white.opacity(0.35))
                     Text("No Bluetooth Audio Connected")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(.system(size: 11, weight: .medium, design: .default))
+                        .foregroundColor(.white.opacity(0.50))
                 }
                 .frame(maxWidth: .infinity, minHeight: 60)
             }
@@ -350,19 +393,29 @@ public struct NotchExpandedView: View {
     }
     
     private func batteryPod(label: String, level: Int, icon: String) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 3.5) {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundColor(.white.opacity(0.85))
+            
             Text("\(level)%")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .bold, design: .default))
+                .monospacedDigit()
                 .foregroundColor(level < 20 ? .red : .white)
+            
             Text(label)
-                .font(.system(size: 9, weight: .regular))
+                .font(.system(size: 9, weight: .regular, design: .default))
                 .foregroundColor(.white.opacity(0.45))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.06)))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
     }
 }

@@ -30,6 +30,9 @@ public final class AppSettings: ObservableObject {
             SoundManager.shared.isSoundEnabled = soundEffectsEnabled
         }
     }
+    @Published public var notchHapticsEnabled: Bool {
+        didSet { defaults.set(notchHapticsEnabled, forKey: "notchHapticsEnabled") }
+    }
     @Published public var shelfEnabled: Bool {
         didSet { defaults.set(shelfEnabled, forKey: "shelfEnabled") }
     }
@@ -58,6 +61,7 @@ public final class AppSettings: ObservableObject {
         self.batteryHUDEnabled = defaults.object(forKey: "batteryHUDEnabled") as? Bool ?? true
         self.airPodsHUDEnabled = defaults.object(forKey: "airPodsHUDEnabled") as? Bool ?? true
         self.soundEffectsEnabled = defaults.object(forKey: "soundEffectsEnabled") as? Bool ?? true
+        self.notchHapticsEnabled = defaults.object(forKey: "notchHapticsEnabled") as? Bool ?? true
         self.shelfEnabled = defaults.object(forKey: "shelfEnabled") as? Bool ?? true
         self.virtualNotchOnExternalDisplays = defaults.object(forKey: "virtualNotchOnExternalDisplays") as? Bool ?? false
         self.useSystemAccentColor = defaults.object(forKey: "useSystemAccentColor") as? Bool ?? true
